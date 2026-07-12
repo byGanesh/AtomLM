@@ -64,22 +64,3 @@ class AtomLM(nn.Module):
             x = block(x)
         x = self.ln_f(x)
         return self.head(x)
-
-
-# quick test
-if __name__ == "__main__":
-    model = AtomLM(
-        vocab_size=8000,
-        d_model=128,
-        n_heads=4,
-        n_layers=4,
-        ffn_dim=512,
-        max_seq_len=256
-    )
-    total = sum(p.numel() for p in model.parameters())
-    print(f"Parameters: {total:,}")
-
-    x = torch.randint(0, 8000, (2, 64))
-    logits = model(x)
-    print(f"Input:  {x.shape}")
-    print(f"Output: {logits.shape}")
