@@ -21,7 +21,7 @@ class MultiHeadAttention(nn.Module):
         v = self.v(x).view(B, T, self.n_heads, self.head_dim).transpose(1,2)
 
         scores = (q @ k.transpose(-2,-1)) / math.sqrt(self.head_dim)
-        mask = torch.triu(torch.ones(T, T), diagonal=1).bool()
+        mask = torch.triu(torch.ones(T, T, device=x.device), diagonal=1).bool()
         scores = scores.masked_fill(mask, float('-inf'))
         weights = torch.softmax(scores, dim=-1)
 
