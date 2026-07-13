@@ -9,7 +9,7 @@ FFN_DIM = 1024
 MAX_SEQ_LEN = 128
 
 # Training
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 EPOCHS = 5
 LR = 3e-4
 
