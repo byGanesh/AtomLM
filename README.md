@@ -22,6 +22,8 @@ Language → Knowledge → Reasoning → Tools
 
 #### Stage 1
 
+![Stage 1 architecture](assets/stage1_architecture.png)
+
 | Component | Details |
 |---|---|
 | Architecture | Decoder-only Transformer |
@@ -60,6 +62,8 @@ Results:
 | 1 | 2.7389 | 1609s |
 | 2 | ~2.10 | 1622s |
 | 3 | 1.9828 | 1622s |
+
+![Stage 1 loss curve](assets/stage1_loss_curve.png)
 
 Training was interrupted during epoch 4.
 
