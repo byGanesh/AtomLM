@@ -53,6 +53,8 @@ print(f"\nParameters: {sum(p.numel() for p in model.parameters()):,}")
 print(f"Batches per epoch: {len(loader)}")
 print("\nTraining...\n")
 
+config.CHECKPOINT_DIR.mkdir(exist_ok=True)
+
 for epoch in range(config.EPOCHS):
     total_loss = 0
     start = time.time()
