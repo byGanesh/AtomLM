@@ -1,14 +1,7 @@
 import torch
 from tokenizers import ByteLevelBPETokenizer
 from model import AtomLM
-
-
-VOCAB_SIZE = 8000
-D_MODEL = 128
-N_HEADS = 4
-N_LAYERS = 4
-FFN_DIM = 512
-MAX_SEQ_LEN = 128
+from config import VOCAB_SIZE, D_MODEL, N_HEADS, N_LAYERS, FFN_DIM, MAX_SEQ_LEN
 
 tokenizer = ByteLevelBPETokenizer(
     "tokenizer/vocab.json",
@@ -17,7 +10,7 @@ tokenizer = ByteLevelBPETokenizer(
 
 
 model = AtomLM(VOCAB_SIZE, D_MODEL, N_HEADS, N_LAYERS, FFN_DIM, MAX_SEQ_LEN)
-model.load_state_dict(torch.load("checkpoints/atomlm_stage1.pt", weights_only=True))
+model.load_state_dict(torch.load("checkpoints/atomlm_epoch3.pt", weights_only=True, map_location="cpu"))
 model.eval()
 
 def generate(prompt, max_new_tokens=100, temperature=0.8):
@@ -36,6 +29,9 @@ def generate(prompt, max_new_tokens=100, temperature=0.8):
 
     return tokenizer.decode(x[0].tolist())
 
-print(generate("Once upon a time", temperature=0.5))
-print("temperature 1.2-------")
-print(generate("Once upon a time", temperature=1.2))
+print("AtomLM ready. Type your prompt (ctrl+c to exit)\n")
+while True:
+    prompt = input(">>> ")
+    if prompt.strip():
+        print(generate(prompt))
+        print()
