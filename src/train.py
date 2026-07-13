@@ -69,6 +69,8 @@ for epoch in range(config.EPOCHS):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
+        if step % 1000 == 0 and step > 0:
+            torch.save(model.state_dict(), config.CHECKPOINT_DIR / f"atomlm_epoch{epoch+1}_step{step}.pt")
 
         total_loss += loss.item()
 
@@ -79,7 +81,7 @@ for epoch in range(config.EPOCHS):
     elapsed = time.time() - start
     print(f"\nEpoch {epoch+1} done | Avg Loss {avg_loss:.4f} | Time {elapsed:.1f}s\n")
 
-    torch.save(model.state_dict(), f"checkpoints/atomlm_epoch{epoch+1}.pt")
+    torch.save(model.state_dict(), config.CHECKPOINT_DIR / f"atomlm_epoch{epoch+1}.pt")
     print(f"Saved checkpoints/atomlm_epoch{epoch+1}.pt")
 
 # save
