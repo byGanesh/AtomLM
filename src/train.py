@@ -28,6 +28,8 @@ loader = DataLoader(
     shuffle=True
 )
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Device: {device}")
 
 model = AtomLM(
     config.VOCAB_SIZE,
@@ -36,7 +38,7 @@ model = AtomLM(
     config.N_LAYERS,
     config.FFN_DIM,
     config.MAX_SEQ_LEN
-)
+).to(device)
 
 
 optimizer = torch.optim.AdamW(
@@ -56,6 +58,7 @@ for epoch in range(config.EPOCHS):
     start = time.time()
 
     for step, (x, y) in enumerate(loader):
+        x,y = x.to(device), y.to(device)
         logits = model(x)
 
         loss = loss_fn(logits.view(-1, config.VOCAB_SIZE), y.view(-1))
@@ -73,6 +76,9 @@ for epoch in range(config.EPOCHS):
     avg_loss = total_loss / len(loader)
     elapsed = time.time() - start
     print(f"\nEpoch {epoch+1} done | Avg Loss {avg_loss:.4f} | Time {elapsed:.1f}s\n")
+
+    torch.save(model.state_dict(), f"checkpoints/atomlm_epoch{epoch+1}.pt")
+    print(f"Saved checkpoints/atomlm_epoch{epoch+1}.pt")
 
 # save
 Path("checkpoints").mkdir(exist_ok=True)
