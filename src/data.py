@@ -1,5 +1,5 @@
 import torch
-import torch.utils.data import Dataset
+from torch.utils.data import Dataset
 from tokenizers import ByteLevelBPETokenizer
 from datasets import load_dataset
 from pathlib import Path

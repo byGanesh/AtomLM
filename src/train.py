@@ -1,90 +1,179 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from tokenizers import ByteLevelBPETokenizer
-from pathlib import Path
-from model import AtomLM
-from dataset import StoryDataset
-import config
+from torch.utils.data import DataLoader, DistributedSampler
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
+import torch.distributed as dist
 import time
+import os
+from model import AtomLM
+from data import AtomDataset
+import config
 
-tokenizer = ByteLevelBPETokenizer(
-    str(config.TOKENIZER_DIR / "vocab.json"),
-    str(config.TOKENIZER_DIR / "merges.txt")
-)
+# DDP
+def setup_ddp():
+    init_process_group(backend="nccl")
+    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
+
+def is_master():
+    return not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0
+
+def get_device():
+    if dist.is_available() and dist.is_initialized():
+        return torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# LR schedule
+def get_lr(step, total_steps):
+    # linear warmup
+    if step < config.WARMUP_STEPS:
+        return config.LR * step / config.WARMUP_STEPS
+    # cosine decay to MIN_LR
+    progress = (step - config.WARMUP_STEPS) / (total_steps - config.WARMUP_STEPS)
+    cosine   = 0.5 * (1.0 + torch.cos(torch.tensor(progress * 3.14159)).item())
+    return config.MIN_LR + (config.LR - config.MIN_LR) * cosine
+
+# checkpoint
+def save_checkpoint(model, optimizer, step, loss):
+    raw_model = model.module if hasattr(model, 'module') else model
+    config.CHECKPOINT_DIR.mkdir(exist_ok=True)
+    path = config.CHECKPOINT_DIR / f"step_{step}.pt"
+    torch.save({
+        'step': step,
+        'model_state_dict': raw_model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss,
+    }, path)
+
+    torch.save({
+        'step': step,
+        'model_state_dict': raw_model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss,
+    }, config.CHECKPOINT_DIR / 'latest.pt')
+    print(f"checkpoint saved. step_{step}.pt")
+
+def load_checkpoint(model, optimizer):
+    path = config.CHECKPOINT_DIR / "latest.pt"
+    if not path.exists():
+        return 0, float('inf')
+    print(f"Resuming from {path}")
+    ckpt = torch.load(path, map_location='cpu')
+    raw_model = model.module if hasattr(model, 'module') else model
+    raw_model.load_state_dict(ckpt['model_state_dict'])
+    optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+    print(f"resumed from step {ckpt['step']}, loss {ckpt['loss']:.4f}")
+    return ckpt['step'], ckpt['loss']
+
+# Main
+def main():
+    # ddp only init if lauched it with torchrun
+    ddp = "LOCAL_RANK" in os.environ
+    if ddp:
+        setup_ddp()
+
+    device = get_device()
+
+    # dataset and loader
+    dataset = AtomDataset()
+    sampler = DistributedSampler(dataset) if ddp else None
+    loader = DataLoader(
+        dataset,
+        batch_size = config.BATCH_SIZE,
+        shuffle = (sampler is None),
+        sampler = sampler,
+        pin_memory = True,
+        num_workers = 2,
+    )
+
+    # model
+    model = AtomLM().to(device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr = config.LR,
+        weight_decay = config.WEIGHT_DECAY,
+        betas = (0.9, 0.95),
+    )
+
+    # resume if checkpoint exists
+    start_step, _ = load_checkpoint(model, optimizer)
+
+    if ddp:
+        model = DDP(model, device_ids=[int(os.environ["LOCAL_RANK"])])
+
+    # fp16
+    scaler = torch.amp.GradScaler('cuda', enabled=(config.PRECISION == "fp16"))
+
+    total_steps = len(loader) * config.EPOCHS // config.GRAD_ACCUM
+
+    if is_master():
+        raw = model.module if hasattr(model, 'module') else model
+        print(f"AtomLM params: {raw.num_params():, }")
+        print(f"Device: {device}")
+        print(f"Tota; steps: {len(loader)}")
+        print(f"Resuming from : step {start_step}")
+        print("\n Training...\n")
+    config.CHECKPOINT_DIR.mkdir(exist_ok=True)
+
+    global_step = 0
+    optimizer.zero_grad()
+
+    for epoch in range(config.EPOCHS):
+        if ddp:
+            sampler.set_epoch(epoch)
+
+        model.train()
+        total_loss = 0
+        t0         = time.time()
+
+        for step, (x, y) in enumerate(loader):
+
+            if global_step < start_step:
+                global_step += 1
+                continue
+
+            x, y = x.to(device), y.to(device)
+
+            # fp16 forward pass
+            with torch.amp.autocast('cuda', enabled=(config.PRECISION == "fp16")):
+                logits, loss = model(x, y)
+                loss         = loss / config.GRAD_ACCUM   # scale loss for accumulation
+
+            scaler.scale(loss).backward()
+            total_loss += loss.item() * config.GRAD_ACCUM
+
+            if (step + 1) % config.GRAD_ACCUM == 0:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), config.GRAD_CLIP)
+
+                # cosine LR
+                lr = get_lr(global_step, total_steps)
+                for pg in optimizer.param_groups:
+                    pg['lr'] = lr
+
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+
+                global_step += 1
+
+                if is_master() and global_step % 100 == 0:
+                    print(f"epoch {epoch+1} | step {global_step} | "
+                            f"loss {total_loss / (step+1):.4f} | "
+                            f"lr {lr:.2e}")
+
+                if is_master() and global_step % config.CHECKPOINT_EVERY == 0:
+                    save_checkpoint(model, optimizer, global_step, loss.item())
+
+        if is_master():
+            avg  = total_loss / len(loader)
+            secs = time.time() - t0
+            print(f"\nepoch {epoch+1} done | avg loss {avg:.4f} | {secs:.0f}s\n")
+            save_checkpoint(model, optimizer, global_step, avg)
+
+    if ddp:
+        destroy_process_group()
 
 
-dataset = StoryDataset(
-    config.DATA_FILE,
-    tokenizer,
-    config.MAX_SEQ_LEN,
-    config.MAX_SAMPLES
-)
-
-
-loader = DataLoader(
-    dataset,
-    batch_size=config.BATCH_SIZE,
-    shuffle=True
-)
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Device: {device}")
-
-model = AtomLM(
-    config.VOCAB_SIZE,
-    config.D_MODEL,
-    config.N_HEADS,
-    config.N_LAYERS,
-    config.FFN_DIM,
-    config.MAX_SEQ_LEN
-).to(device)
-
-
-optimizer = torch.optim.AdamW(
-    model.parameters(),
-    lr=config.LR
-)
-
-
-loss_fn = nn.CrossEntropyLoss()
-
-print(f"\nParameters: {sum(p.numel() for p in model.parameters()):,}")
-print(f"Batches per epoch: {len(loader)}")
-print("\nTraining...\n")
-
-config.CHECKPOINT_DIR.mkdir(exist_ok=True)
-
-for epoch in range(config.EPOCHS):
-    total_loss = 0
-    start = time.time()
-
-    for step, (x, y) in enumerate(loader):
-        x,y = x.to(device), y.to(device)
-        logits = model(x)
-
-        loss = loss_fn(logits.view(-1, config.VOCAB_SIZE), y.view(-1))
-
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        optimizer.step()
-        if step % 1000 == 0 and step > 0:
-            torch.save(model.state_dict(), config.CHECKPOINT_DIR / f"atomlm_epoch{epoch+1}_step{step}.pt")
-
-        total_loss += loss.item()
-
-        if step % 100 == 0:
-            print(f"Epoch {epoch+1} | Step {step} | Loss {loss.item():.4f}")
-
-    avg_loss = total_loss / len(loader)
-    elapsed = time.time() - start
-    print(f"\nEpoch {epoch+1} done | Avg Loss {avg_loss:.4f} | Time {elapsed:.1f}s\n")
-
-    torch.save(model.state_dict(), config.CHECKPOINT_DIR / f"atomlm_epoch{epoch+1}.pt")
-    print(f"Saved checkpoints/atomlm_epoch{epoch+1}.pt")
-
-# save
-Path("checkpoints").mkdir(exist_ok=True)
-torch.save(model.state_dict(), "checkpoints/atomlm_stage1.pt")
-print("Model saved to checkpoints/atomlm_stage1.pt")
+if __name__ == "__main__":
+    main()
