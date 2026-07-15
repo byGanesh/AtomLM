@@ -17,6 +17,7 @@ PROBLEM_TOKEN_ID = 1
 STEP_TOKEN_ID = 2
 ANSWER_TOKEN_ID = 3
 END_TOKEN_ID = 4
+SPECIAL_TOKENS = ["<|pad|>", "<|problem|>", "<|step|>", "<|answer|>", "<|end|>"]
 
 # Training
 BATCH_SIZE = 16
