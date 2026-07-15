@@ -2,6 +2,7 @@ from tokenizers import ByteLevelBPETokenizer
 from datasets import load_dataset
 from pathlib import Path
 from config import VOCAB_SIZE, SPECIAL_TOKENS, TOKENIZER_DIR
+import re
 
 def get_texts():
     print("MetaMathQA...")
@@ -19,9 +20,11 @@ def get_texts():
             break
 
     print("GSM8K...")
-    ds = load_dataset("roneneldan/TinyStories", split="train")
-    for row in ds:
-        yield row['question'] + " " + row['answer']
+    ds = load_dataset("openai/gsm8k", "main", split="train")
+    for i, row in enumerate(ds):
+        answer = re.sub(r'<<.*?>>', '', row['answer'])
+        yield row['question'] + " " + answer
+        if i >= 7000: break
 
     print("ARC...")
     ds = load_dataset("allenai/ai2_arc", "ARC-Challenge", split="train")
