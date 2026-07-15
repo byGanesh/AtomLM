@@ -22,8 +22,7 @@ def get_texts():
     print("GSM8K...")
     ds = load_dataset("openai/gsm8k", "main", split="train")
     for i, row in enumerate(ds):
-        answer = re.sub(r'<<.*?>>', '', row['answer'])
-        yield row['question'] + " " + answer
+        yield row['question'] + " " + row['answer']
         if i >= 7000: break
 
     print("ARC...")
