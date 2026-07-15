@@ -35,11 +35,11 @@ PRECISION = "fp16"
 
 # Datasets
 DATASET_WEIGHTS = {
-    "tinystories": 0.10,
-    "metamathqa":  0.20,
-    "gsm8k":       0.01,
-    "python_code": 0.60,
-    "arc":         0.09,
+    "tinystories": 0.10,   # grammar
+    "metamathqa":  0.40,   # math reasoning
+    "gsm8k":       0.05,   # math reasoning
+    "arc":         0.05,   # science reasoning
+    "openwebmath": 0.40,   # math + science + logic from the web
 }
 
 
