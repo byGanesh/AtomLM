@@ -50,11 +50,26 @@ def stream_arc(n):
         count += 1
         if count >= n: break
 
+def stream_python_code(n):
+    ds = load_dataset(
+        "codeparrot/github-code",
+        streaming=True,
+        split="train",
+        trust_remote_code=True,
+    )
+    count = 0
+    for row in ds:
+        if row['language'] == 'Python':
+            yield f"<|problem|>Write Python code:<|step|>{row['code']}<|end|>"
+            count += 1
+            if count >= n: break
+
 DATASET_STREAMS = {
-    "metamathqa": stream_metamathqa,
-    "gsm8k": stream_gsm8k,
+    "metamathqa":  stream_metamathqa,
+    "gsm8k":       stream_gsm8k,
     "tinystories": stream_tinystories,
-    "arc":stream_arc,
+    "arc":         stream_arc,
+    "python_code": stream_python_code,
 }
 
 # build func: stream raw data, tokenize it, pack into binrary file
