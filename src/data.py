@@ -41,11 +41,14 @@ def stream_tinystories(n_samples):
         yield format_tinystories(row)
         if i >= n_samples: break
 
-def stream_arc(n_samples):
-    ds = load_dataset("allenai/ai2_arc", "ARC-Challenge", split="train")
-    for i, row in enumerate(ds):
+def stream_arc(n):
+    ds1 = load_dataset("allenai/ai2_arc", "ARC-Challenge", split="train")
+    ds2 = load_dataset("allenai/ai2_arc", "ARC-Easy", split="train")
+    count = 0
+    for row in list(ds1) + list(ds2):
         yield format_arc(row)
-        if i >= n_samples: break
+        count += 1
+        if count >= n: break
 
 DATASET_STREAMS = {
     "metamathqa": stream_metamathqa,
