@@ -175,5 +175,111 @@ def main():
         destroy_process_group()
 
 
+# SMOKE TEST
+def smoke_test():
+    """
+    Run 10 steps using the real training pipeline,
+    but with a tiny batch and sequence length.
+    """
+    print("\n" + "=" * 50)
+    print("SMOKE TEST — 10 steps")
+    print("=" * 50)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = AtomLM().to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.LR)
+    scaler = torch.cuda.amp.GradScaler(
+        enabled=(torch.cuda.is_available() and config.PRECISION == "fp16")
+    )
+
+    # Tiny settings (instead of config values)
+    BATCH_SIZE = 2
+    SEQ_LEN = 32
+    STEPS = 10
+
+    losses = []
+
+    model.train()
+
+    for step in range(STEPS):
+
+        x = torch.randint(
+            0,
+            config.VOCAB_SIZE,
+            (BATCH_SIZE, SEQ_LEN),
+            device=device,
+        )
+
+        y = torch.randint(
+            0,
+            config.VOCAB_SIZE,
+            (BATCH_SIZE, SEQ_LEN),
+            device=device,
+        )
+
+        with torch.cuda.amp.autocast(
+            enabled=(torch.cuda.is_available() and config.PRECISION == "fp16")
+        ):
+            _, loss = model(x, y)
+            loss = loss / config.GRAD_ACCUM
+
+        scaler.scale(loss).backward()
+
+        if (step + 1) % config.GRAD_ACCUM == 0:
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(),
+                config.GRAD_CLIP,
+            )
+
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
+
+        losses.append(loss.item() * config.GRAD_ACCUM)
+
+        print(f"step {step+1:2d} | loss {losses[-1]:.4f}")
+
+    # Verify loss
+    assert not any(torch.isnan(torch.tensor(losses))), "NaN loss detected"
+    assert not any(torch.isinf(torch.tensor(losses))), "Inf loss detected"
+    print("✓ Loss OK")
+
+    # Save checkpoint
+    config.CHECKPOINT_DIR.mkdir(exist_ok=True)
+    save_checkpoint(model, optimizer, step=STEPS, loss=losses[-1])
+    assert (config.CHECKPOINT_DIR / "latest.pt").exists()
+    print("✓ Checkpoint Save OK")
+
+    # Load checkpoint
+    model2 = AtomLM().to(device)
+    optimizer2 = torch.optim.AdamW(model2.parameters(), lr=config.LR)
+
+    loaded_step, loaded_loss = load_checkpoint(model2, optimizer2)
+
+    assert loaded_step == STEPS
+    print("✓ Checkpoint Load OK")
+
+    # Generation
+    prompt = torch.randint(
+        0,
+        config.VOCAB_SIZE,
+        (1, 8),
+        device=device,
+    )
+
+    with torch.no_grad():
+        generated = model.generate(prompt, max_new_tokens=8)
+
+    assert generated.shape == (1, 16)
+    print("✓ Generation OK")
+
+    print("\n✓ Smoke test passed — safe to train\n")
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--smoke" in sys.argv:
+        smoke_test()
+    else:
+        main()
