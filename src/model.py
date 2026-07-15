@@ -114,11 +114,11 @@ class AtomLM(nn.Module):
             elif isinstance(module, nn.Embedding):
                 nn.init.normal_(module.weight, mean = 0.0, std=0.02)
 
-            # residual projections scaling
-            scale = 1.0 / math.sqrt(2 * N_LAYERS)
-            for name, param in self.named_parameters():
-                if 'o_proj.weight' in name or 'down.weight' in name:
-                    param.data.mul_(scale)
+        # residual projections scaling
+        scale = 1.0 / math.sqrt(2 * N_LAYERS)
+        for name, param in self.named_parameters():
+            if 'o_proj.weight' in name or 'down.weight' in name:
+                param.data.mul_(scale)
 
     def forward(self, idx, targets = None):
         B, T = idx.shape
@@ -168,3 +168,20 @@ class AtomLM(nn.Module):
 
     def num_params(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+# testing
+# if __name__ == "__main__":
+#     model = AtomLM()
+#     print(f"Parameters: {model.num_params():,}")
+
+#     idx = torch.randint(0, VOCAB_SIZE, (2, MAX_SEQ_LEN))
+#     targets = torch.randint(0, VOCAB_SIZE, (2, MAX_SEQ_LEN))
+
+#     logits, loss = model(idx, targets)
+#     print(f"Logits:  {tuple(logits.shape)}")
+#     print(f"Loss:    {loss.item():.4f}")
+#     print(f"Expected ≈ {__import__('math').log(VOCAB_SIZE):.4f}")
+
+#     loss.backward()
+#     print("Backward: OK")
