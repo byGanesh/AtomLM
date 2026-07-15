@@ -118,7 +118,7 @@ class AtomDataset(Dataset):
         return chunk[:-1], chunk[1:]
 
 if __name__ == "__main__":
-    build(total_samples=500_000)
+    build(total_samples=2_000_000)
     ds = AtomDataset()
     x, y = ds[0]
     print(f"\nSample 0:")

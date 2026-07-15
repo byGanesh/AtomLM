@@ -20,8 +20,8 @@ END_TOKEN_ID = 4
 SPECIAL_TOKENS = ["<|pad|>", "<|problem|>", "<|step|>", "<|answer|>", "<|end|>"]
 
 # Training
-BATCH_SIZE = 4
-GRAD_ACCUM = 32
+BATCH_SIZE = 8
+GRAD_ACCUM = 16
 EPOCHS = 3
 LR = 2e-4
 MIN_LR = 2e-5
