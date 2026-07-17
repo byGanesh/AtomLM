@@ -1,150 +1,97 @@
 # AtomLM
 
-A small decoder-only Transformer language model built from scratch using PyTorch.
+> A decoder-only Transformer language model built completely from scratch in PyTorch for learning, research, and experimentation.
 
-The goal of AtomLM is to understand how language models work by implementing, training, and experimenting with every part of the pipeline.
+AtomLM is a research project exploring how modern Large Language Models are built from tokenization and attention mechanisms to distributed training, instruction tuning, reasoning, and tool use.
 
-## About
+Unlike projects that simply fine-tune existing LLMs, AtomLM is trained from scratch with a custom architecture and training pipeline.
 
-It is an experiment to study:
-- Transformer architecture
-- Training behavior
-- Data scaling
-- Model limitations
-- Reasoning experiments
+## Features
 
-The project follows a staged approach:
+* Decoder-only Transformer
+* RoPE (Rotary Positional Embeddings)
+* FlashAttention
+* Grouped Query Attention (GQA)
+* RMSNorm
+* SwiGLU Feed Forward Network
+* Mixed Precision (FP16)
+* Distributed Data Parallel (DDP)
+* Byte-Level BPE tokenizer
+* Cosine Learning Rate Scheduler
+* Gradient Accumulation
+* Checkpointing & Resume Training
 
-Language → Knowledge → Reasoning → Tools
+
+## Current Base Model
+
+| Property        | Value             |
+| --------------- | ----------------- |
+| Parameters      | 52.3M             |
+| Layers          | 16                |
+| Hidden Size     | 512               |
+| Attention Heads | 8                 |
+| KV Heads        | 2 (GQA)           |
+| Context Length  | 1024              |
+| Vocabulary      | 8K Byte-Level BPE |
+| Framework       | PyTorch           |
 
 
-## Architecture
+## Current Status
 
-#### Stage 1
+The current checkpoint is a **base pretrained model**.
 
-![Stage 1 architecture](assets/stage1_architecture.png)
+It has learned:
 
-| Component | Details |
-|---|---|
-| Architecture | Decoder-only Transformer |
-| Parameters | 8.8M |
-| Layers | 6 |
-| Attention heads | 8 |
-| d_model | 256 |
-| FFN dimension | 1024 |
-| Vocabulary size | 8000 |
-| Tokenizer | ByteLevel BPE |
-| Context length | 128 tokens |
-| Activation | GELU |
-| Normalization | Pre-LayerNorm |
+* English grammar
+* Story generation
+* Basic mathematical reasoning patterns
+* Long-form text generation
+* Structured reasoning format
 
-## Training
+It has **not yet** been instruction-tuned or aligned, so factual accuracy, reasoning quality, and instruction following remain limited.
 
-### Stage 1 Experiment 002
 
-Dataset:
-- TinyStories
-- 2.1M stories
-- ~85M tokens
+## Roadmap
 
-Hardware:
-- Kaggle T4 x2 GPU
+**Foundation**  
 
-Configuration:
-- Batch size: 128
-- Learning rate: 3e-4
-- Context length: 128
+- [x] Prototype Language Model (2.2M parameters)
+- [x] Transformer Baseline (8.8M parameters, TinyStories pretraining)
+- [x] AtomLM Base (52M parameters)
+  - Decoder-only Transformer
+  - RoPE
+  - FlashAttention
+  - Grouped Query Attention (GQA)
+  - RMSNorm
+  - SwiGLU
+  - Pretrained on 343M tokens
 
-Results:
+**Model Training**  
 
-| Epoch | Average Loss | Time |
-|---|---|---|
-| 1 | 2.7389 | 1609s |
-| 2 | ~2.10 | 1622s |
-| 3 | 1.9828 | 1622s |
+- [ ] Continued Pretraining
+- [ ] Supervised Instruction Fine-Tuning (SFT)
+- [ ] Reasoning Fine-Tuning
+- [ ] Tool-Use Training (Search, Python, Calculator)
+- [ ] Preference Alignment (RLHF / DPO / GRPO)
 
-![Stage 1 loss curve](assets/stage1_loss_curve.png)
+**Optimization**  
 
-Training was interrupted during epoch 4.
+- [ ] Quantization & Efficient Inference
+- [ ] Mobile Deployment
+- [ ] Long-Context Support
+- [ ] Retrieval-Augmented Generation (RAG)
 
-**Capabilities**  
+**Scaling**  
 
-After TinyStories training, AtomLM can:
-- Generate short stories
-- Create simple dialogue
-- Maintain characters over short contexts
-- Follow common story patterns
+- [ ] AtomLM-100M
+- [ ] AtomLM-300M
+- [ ] AtomLM-1B
 
-Example:
+Training logs, generations, loss curves, and experiment history are available in:
 
-Prompt:
 ```
-Once upon a time
+results/LOGS.md
 ```
-
-Output:
-```
-Once upon a time, there was a little boy named Timmy.
-Timmy loved to play with his toys in his room.
-```
-
-**Limitations**
-
-Current AtomLM:
-
-- Does not have factual knowledge
-- Cannot perform reliable reasoning
-- Has a 128 token context window
-- Mostly performs pattern completion
-
-Example:
-
-Prompt:
-```
-Ganesh loves artificial intelligence and he
-```
-
-Output:
-```
-Ganesh loves artificial intelligence and he is like
-a princess and a boat.
-```
-
-The model learned language patterns but does not understand the meaning.
-
-
-## Planned Experiments
-
-### Stage 2: Knowledge
-
-Train on:
-- Wikipedia
-- Educational text
-
-Goal:
-- Improve factual knowledge
-
-### Stage 3: Reasoning
-
-Train on:
-- GSM8K
-- MATH
-- Mathematical proofs
-
-Goal:
-- Improve mathematical reasoning
-
-### Stage 4: Tools
-
-Add:
-- SymPy
-- Lean
-- External memory
-
-Goal:
-- Build a tool-assisted reasoning system
-
----
 
 ## Project Structure
 
@@ -165,17 +112,6 @@ AtomLM/
 └── README.md
 
 ```
-
----
-
-## Tech Stack
-
-- PyTorch
-- HuggingFace Tokenizers
-- HuggingFace Datasets
-- Kaggle GPUs
-
----
 
 ## Author
 

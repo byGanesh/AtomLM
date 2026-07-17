@@ -75,7 +75,7 @@ def main():
 
     device = get_device()
 
-    # rank 0 loads first, others wait
+
     if ddp and dist.get_rank() != 0:
         dist.barrier()
 
@@ -152,8 +152,8 @@ def main():
 
             total_loss += loss.item() * config.GRAD_ACCUM
 
-            if is_master() and step % 50 == 0:
-                print(f"  batch {step} | loss {loss.item() * config.GRAD_ACCUM:.4f}", flush=True)
+            # if is_master() and step % 50 == 0:
+            #     print(f"  batch {step} | loss {loss.item() * config.GRAD_ACCUM:.4f}", flush=True)
 
             if (step + 1) % config.GRAD_ACCUM == 0:
                 scaler.unscale_(optimizer)
