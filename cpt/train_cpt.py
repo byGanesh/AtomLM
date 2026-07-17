@@ -11,7 +11,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from model import AtomLM
-from dataset_cpt import AtomDataset
+from data_cpt import AtomDataset
 import config_cpt as config
 
 # ── DDP ─────────────────────────────────────────────────────────

@@ -78,7 +78,7 @@ print("Wrapped and re-saved.")
 
 ```python
 %cd /kaggle/working/AtomLM/cpt
-!python dataset_cpt.py
+!python data_cpt.py
 ```
 
 This will take 30–60 minutes depending on download speed. Wikipedia alone is a few GB. Watch the output — it prints token counts per dataset as it goes.
