@@ -104,11 +104,12 @@ DATASET_STREAMS = {
     "gsm8k":       stream_gsm8k,
 }
 
+ROOT = Path(__file__).resolve().parent.parent
 
 def build(total_tokens=300_000_000):
     tokenizer = ByteLevelBPETokenizer(
-        str(TOKENIZER_DIR / "vocab.json"),
-        str(TOKENIZER_DIR / "merges.txt"),
+        str(ROOT / "tokenizer" / "vocab.json"),
+        str(ROOT / "tokenizer" / "merges.txt")
     )
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
